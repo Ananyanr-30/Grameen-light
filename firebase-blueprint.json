@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "Pole": {
+      "title": "Pole",
+      "description": "Represents a street light pole in the village.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "type": "string", "enum": ["Working", "Fused", "Daytime_On"] },
+        "location": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" }
+      },
+      "required": ["id", "status", "location", "lat", "lng"]
+    },
+    "ComplaintHistoryEvent": {
+      "title": "ComplaintHistoryEvent",
+      "description": "An event in the history of a complaint.",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["Pending", "Assigned", "Fixed"] },
+        "timestamp": { "type": "number" },
+        "note": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["status", "timestamp"]
+    },
+    "Complaint": {
+      "title": "Complaint",
+      "description": "A report filed for a specific pole.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "poleId": { "type": "string" },
+        "issueType": { "type": "string", "enum": ["Working", "Fused", "Daytime_On"] },
+        "status": { "type": "string", "enum": ["Pending", "Assigned", "Fixed"] },
+        "timestamp": { "type": "number" },
+        "history": { "type": "array", "$ref": "#/entities/ComplaintHistoryEvent" },
+        "panchayatNotes": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "poleId", "issueType", "status", "timestamp", "history"]
+    },
+    "VillageStats": {
+      "title": "VillageStats",
+      "description": "Aggregated statistics for the village.",
+      "type": "object",
+      "properties": {
+        "totalPoles": { "type": "number" },
+        "fusedCount": { "type": "number" },
+        "daytimeOnCount": { "type": "number" },
+        "energySavedKWh": { "type": "number" }
+      },
+      "required": ["totalPoles", "fusedCount", "daytimeOnCount", "energySavedKWh"]
+    }
+  },
+  "firestore": {
+    "poles": {
+      "schema": "Pole",
+      "description": "Collection of all street light poles."
+    },
+    "complaints": {
+      "schema": "Complaint",
+      "description": "Collection of all citizen complaints."
+    },
+    "stats": {
+      "schema": "VillageStats",
+      "description": "Global village statistics (single document summary)."
+    }
+  }
+}

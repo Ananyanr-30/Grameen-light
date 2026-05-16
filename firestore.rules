@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is number && 
+             ts > (request.time.toMillis() - 300000) && 
+             ts < (request.time.toMillis() + 300000); // 5 minute window
+    }
+
+    // --- Validation Blueprints ---
+    
+    function isValidPole(data) {
+      return data.keys().hasAll(['id', 'status', 'location', 'lat', 'lng']) &&
+             data.keys().size() == 5 &&
+             data.id is string && data.id.size() <= 10 &&
+             data.status in ['Working', 'Fused', 'Daytime_On'] &&
+             data.location is string && data.location.size() <= 200 &&
+             data.lat is number && data.lng is number;
+    }
+
+    function isValidHistoryEvent(event) {
+      return event.keys().hasAll(['status', 'timestamp']) &&
+             event.status in ['Pending', 'Assigned', 'Fixed'] &&
+             event.timestamp is number &&
+             (event.get('note', '') is string && event.get('note', '').size() <= 500) &&
+             (event.get('attachments', []).size() <= 5);
+    }
+
+    function isValidComplaint(data) {
+      return data.keys().hasAll(['id', 'poleId', 'issueType', 'status', 'timestamp', 'history']) &&
+             data.id is string && data.id.size() <= 64 &&
+             data.poleId is string && data.poleId.size() <= 10 &&
+             data.issueType in ['Working', 'Fused', 'Daytime_On'] &&
+             data.status in ['Pending', 'Assigned', 'Fixed'] &&
+             data.timestamp is number &&
+             data.history is list && data.history.size() <= 50 &&
+             // Basic check on first history element if exists
+             (data.history.size() == 0 || data.history[0].status is string);
+    }
+
+    // --- Collection Matches ---
+
+    match /test/connection {
+      allow read: if true;
+    }
+
+    match /poles/{poleId} {
+      allow read: if true; // Public view
+      allow write: if isSignedIn() && isValidPole(incoming());
+    }
+
+    match /complaints/{complaintId} {
+      allow read: if true; // Transparency - village members can see status
+      
+      allow create: if isSignedIn() && 
+                      isValidId(complaintId) &&
+                      isValidComplaint(incoming()) &&
+                      incoming().id == complaintId &&
+                      incoming().status == 'Pending' &&
+                      isValidTimestamp(incoming().timestamp) &&
+                      exists(/databases/$(database)/documents/poles/$(incoming().poleId));
+
+      allow update: if isSignedIn() &&
+                      isValidComplaint(incoming()) &&
+                      // Basic Immutability
+                      incoming().id == existing().id &&
+                      incoming().poleId == existing().poleId &&
+                      incoming().timestamp == existing().timestamp &&
+                      (
+                        // Action: Update Status or Add Note
+                        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'history', 'panchayatNotes', 'attachments'])
+                      );
+    }
+
+    match /stats/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+  }
+}

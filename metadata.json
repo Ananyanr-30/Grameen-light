@@ -1,0 +1,8 @@
+{
+  "name": "Grameen-Light",
+  "description": "A citizen-led streetlight audit tool for smart villages, aimed at reducing energy waste and improving public safety.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}
